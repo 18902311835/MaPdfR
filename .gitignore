@@ -1,0 +1,10 @@
+build/
+dist/
+*.user
+*.user.*
+CMakeUserPresets.json
+.cache/
+compile_commands.json
+*.rar
+*.zip
+屏幕截图*.png

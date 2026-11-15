@@ -1,0 +1,35 @@
+#include <windows.h>
+
+// Application icon (taskbar, Alt+Tab, Explorer file listing).
+IDI_ICON1 ICON DISCARDABLE "@MAPDFR_APP_ICON@"
+
+// Version information shown by Windows Explorer / file properties.
+// Kept in ASCII on purpose: the resource compiler does not use /utf-8.
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION    @MAPDFR_RC_VERSION@
+ PRODUCTVERSION @MAPDFR_RC_VERSION@
+ FILEFLAGSMASK  VS_FFI_FILEFLAGSMASK
+ FILEFLAGS      0
+ FILEOS         VOS_NT_WINDOWS32
+ FILETYPE       VFT_APP
+ FILESUBTYPE    VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "080404B0"
+        BEGIN
+            VALUE "CompanyName",      "MaPdfR"
+            VALUE "FileDescription",  "MaPdfR - PDF viewer"
+            VALUE "FileVersion",      "@PROJECT_VERSION@"
+            VALUE "InternalName",     "MaPdfR"
+            VALUE "LegalCopyright",   "Copyright (C) 2026 Ma Deyou. All rights reserved."
+            VALUE "OriginalFilename", "MaPdfR.exe"
+            VALUE "ProductName",      "MaPdfR"
+            VALUE "ProductVersion",   "@PROJECT_VERSION@"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0804, 1200
+    END
+END

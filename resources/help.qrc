@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/help">
+        <file alias="user-guide.zh_CN.html">help/user-guide.zh_CN.html</file>
+    </qresource>
+</RCC>

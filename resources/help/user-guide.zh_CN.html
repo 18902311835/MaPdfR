@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>MaPdfR 用户说明书</title>
+<style>
+body { margin: 18px 24px; }
+h1 { font-size: 24pt; margin-bottom: 8px; }
+h2 { font-size: 15pt; margin-top: 22px; margin-bottom: 6px; }
+p, li, td { line-height: 1.35; }
+th, td { padding: 5px 8px; text-align: left; }
+</style>
+</head>
+<body>
+<h1>MaPdfR 用户说明书</h1>
+<p>阅读、查找、复制和审阅 PDF。按 <b>F1</b> 可随时打开本说明书。</p>
+<p><a href="#open">打开与浏览</a> · <a href="#copy">选择与复制</a> · <a href="#search">查找</a> · <a href="#print">打印与审阅</a> · <a href="#save">保存与导出</a> · <a href="#keys">快捷键</a> · <a href="#troubleshooting">常见问题</a></p>
+<hr>
+
+<a name="open"></a><h2>打开与浏览</h2>
+<ol>
+<li>按 <b>Ctrl+O</b> 选择文件，可一次选择多份 PDF，也可以把 PDF 拖入阅读器。从资源管理器再次打开 PDF 时，文件会送到已运行的同一份 MaPdfR。</li>
+<li>每份 PDF 在窗口顶部有一个标签。点击标签，或用 <b>Ctrl+Tab</b>／<b>Ctrl+Shift+Tab</b> 切换。重新打开同一路径会切到原标签。</li>
+<li>按 <b>Ctrl+W</b> 或点标签右侧的 × 关闭当前文档。关闭全部标签后，可在原窗口继续打开文件。</li>
+<li>加密 PDF 会要求输入密码。打开后，在窗口上方输入页码并按 <b>Enter</b>，或用 <b>Page Up</b>／<b>Page Down</b> 翻页。</li>
+<li>用导航面板的「书签」打开章节，用「页面」查看缩略图。<b>F4</b> 显示或隐藏面板，<b>Alt+←</b> 和 <b>Alt+→</b> 浏览前后位置。</li>
+<li>工具栏可放大、缩小、适合宽度和适合整页。在「视图」切换单页或连续页面。<b>F11</b> 进入或退出全屏。</li>
+</ol>
+<p>按 <b>Ctrl+D</b> 查看文件路径、页数、作者及 PDF 生成器等属性。属性值来自文档及本地文件信息。</p>
+
+<a name="copy"></a><h2>选择与复制文本</h2>
+<ol>
+<li>在 PDF 页面找到所需文字。把鼠标放在起始字附近，按住左键，拖到同一页的末尾字附近再松开。高亮表示所选范围。</li>
+<li>页面有焦点时按 <b>Ctrl+C</b>，或右击选择「复制所选文本」。也可使用「编辑 → 复制所选文本」。</li>
+<li>在目标应用按 <b>Ctrl+V</b> 粘贴。点击页面空白处可清除选区。</li>
+</ol>
+<p>复制为纯文本。换行和文字顺序取决于 PDF 的文本层。跨页内容请逐页复制。需要整页时，可用「编辑 → 复制当前页文本」。</p>
+<p>某些 PDF 限制复制，状态栏会提示原因。Qt-only 构建仍可拖选和查看高亮，复制操作需要启用 MuPDF 的构建来校验权限。</p>
+
+<a name="search"></a><h2>查找文本</h2>
+<p>按 <b>Ctrl+F</b> 输入关键词，阅读区会高亮命中。按 <b>F3</b>／<b>Shift+F3</b> 浏览下一个／上一个匹配。<b>Ctrl+Shift+F</b> 打开带页码和上下文的结果列表。按 <b>Esc</b> 关闭查找栏。</p>
+
+<a name="print"></a><h2>打印与审阅</h2>
+<p>按 <b>Ctrl+P</b> 选择系统打印机。在打印对话框中选择全篇、当前页或页码范围及纸张方向，选项以驱动显示为准。页面等比缩放到纸张可打印区域。受限 PDF 可能禁止打印或仅允许低清打印。</p>
+<p>使用「审阅 → 查看当前页便笺」读取已有便笺。要新增便笺，选择「审阅 → 添加便笺并保存副本」，在页面预览中点击放置位置，填写正文，然后另存新 PDF。可切换到新副本继续审阅。签名字段、文档级认证或批注限制可能阻止保存批注副本。</p>
+
+<a name="save"></a><h2>另存与导出</h2>
+<ul>
+<li><b>Ctrl+S</b> 另存原 PDF，保留文档原有结构与密码设置。</li>
+<li><b>Ctrl+M</b> 导出 Markdown。输出包含提取出的文字结构，提取到的图片保存在同目录的 <code>文件名_assets</code> 文件夹。已有同名目录时，新目录会带后缀。请同时保留 Markdown 和它引用的图片目录。</li>
+<li>打印、便笺、复制和 Markdown 导出需要启用 MuPDF。Linux 的 Qt-only 构建提供阅读、搜索、导航和另存。</li>
+</ul>
+
+<a name="keys"></a><h2>常用快捷键</h2>
+<table border="1" cellspacing="0">
+<tr><th>快捷键</th><th>操作</th></tr>
+<tr><td>Ctrl+O / Ctrl+S</td><td>打开 PDF / 另存 PDF</td></tr>
+<tr><td>Ctrl+Tab / Ctrl+Shift+Tab</td><td>下一个 / 上一个 PDF 标签</td></tr>
+<tr><td>Ctrl+W</td><td>关闭当前 PDF 标签</td></tr>
+<tr><td>Ctrl+C</td><td>复制 PDF 页面中所选文本</td></tr>
+<tr><td>Ctrl+F / Ctrl+Shift+F</td><td>查找 / 显示搜索结果</td></tr>
+<tr><td>F3 / Shift+F3</td><td>下一个 / 上一个匹配</td></tr>
+<tr><td>Ctrl+G / Ctrl+D</td><td>输入页码 / 查看文档属性</td></tr>
+<tr><td>Ctrl+P / Ctrl+M</td><td>打印 / 导出 Markdown</td></tr>
+<tr><td>F1 / F4 / F11</td><td>用户说明书 / 导航面板 / 全屏</td></tr>
+</table>
+
+<a name="troubleshooting"></a><h2>常见问题</h2>
+<ul>
+<li><b>文字无法选择或搜索。</b> 扫描 PDF 可能只有页面图片。请使用已有文本层的 PDF，或先用 OCR 工具生成文本层。</li>
+<li><b>文件已被修改。</b> 如果另一个程序替换或移动了源文件，在 MaPdfR 中重新打开后再复制、打印或导出。</li>
+<li><b>复制内容换行异常。</b> 复杂表格、多栏或特殊字体的文本顺序可能与页面视觉结构不同。分段复制后核对结果。</li>
+<li><b>如何设置 Windows 默认阅读器？</b> 在「帮助」下注册 PDF 文件类型，再使用「设为默认 PDF 打开程序」打开 Windows 的系统选择对话框。</li>
+</ul>
+</body>
+</html>
