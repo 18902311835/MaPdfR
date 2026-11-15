@@ -1,6 +1,6 @@
 # MaPdfR — 独立 PDF 阅读器
 
-MaPdfR 1.0.0 —— Windows 与麒麟（Linux aarch64）独立 PDF 阅读器（Qt 6.11.1 静态构建）。查找、打印、便笺与 PDF → Markdown 导出；AGPL v3，附源码与重链接材料
+MaPdfR 1.0.0 —— Windows、macOS（Apple Silicon）与麒麟（Linux aarch64）独立 PDF 阅读器（Qt 6.11.1 静态构建）。查找、打印、便笺与 PDF → Markdown 导出；AGPL v3，附源码与重链接材料
 
 MaPdfR 是从作者开发 **QtNotePad 2.36.2** 中提取 PDF 阅读器代码后重新搭建的独立
 Qt 桌面程序。阅读界面基于 Qt 6 的
@@ -193,6 +193,26 @@ cd MaPdfR-<版本>-linux-aarch64 && ./mapdfr 示例.pdf
 ./install-user.sh          # 可选：安装到 ~/.local，带桌面项与图标
 ```
 
+### macOS（Apple Silicon）完整构建与打包
+
+macOS 用静态 Qt `macos-static`（Qt 6.11.1，最低 macOS 13）和 MuPDF 动态库
+`libmupdf.dylib`。先生成 MuPDF 库，再构建应用包并做离屏测试：
+
+```sh
+tools/build-mupdf-macos.sh /path/to/mupdf-1.27.2-source   # 生成 libmupdf.dylib
+tools/build-macos.sh                                      # 构建 + ctest
+tools/make-release-macos.sh                               # 生成 dist/ 压缩包
+```
+
+- 产物是 `build/macos-arm64/MaPdfR.app`；发行包为
+  `dist/MaPdfR-<版本>-macos-arm64.zip` 及 `.sha256`。
+- `libmupdf.dylib` 的 install_name 改成 `@rpath/libmupdf.dylib`，安装到
+  `MaPdfR.app/Contents/Frameworks`，应用用 `@executable_path/../Frameworks`
+  查找；修改二进制后脚本会重新做 ad-hoc 签名（arm64 必需）。
+- ssh 会话没有窗口服务器，`tools/build-macos.sh` 用
+  `QT_QPA_PLATFORM=offscreen` 跑 ctest；静态 Qt 已链入 qcocoa 与 qoffscreen。
+- 默认路径可用 `QT_PREFIX`、`MUPDF_SOURCE_DIR`、`BUILD_DIR` 覆盖。
+
 产物（Windows）：`build\msvc2022_64-static\MaPdfR.exe`。
 
 ## 使用
@@ -240,6 +260,10 @@ MaPdfR.exe a.pdf b.pdf              :: 各文件在同一窗口的标签中打�
   删除该文件并清理 `~/.config/mimeapps.list` 里的条目；「设为默认」调用
   `xdg-mime default`。deb 安装的桌面项在 `/usr/share/applications`，同样参与
   系统的「打开方式」。
+- macOS 上关联由 LaunchServices 管理：Info.plist 声明 `com.adobe.pdf` 文档
+  类型；「注册」把 MaPdfR.app 登记到 LaunchServices，「设为默认」把 bundle id
+  `cn.madeyou.mapdfr` 写成 PDF 默认处理程序，「取消注册」仅在当前默认程序是
+  MaPdfR 时清除。Finder 的「显示简介 → 打开方式」会同步显示这些改动。
 - 「帮助 → 用户说明书」（`F1`）可离线打开中文使用说明。
 - 「帮助 → 关于 MaPdfR…」：版本、构建信息、第三方组件与许可、
   源码附随说明。
@@ -279,6 +303,10 @@ tools\make-release.bat -WithSource -SkipMuPdfSource   :: 不打包 MuPDF 源码
 Linux / 麒麟发行包用 `tools/make-deb-linux.sh` 生成
 `build/linux-deb/mapdfr_<版本>_arm64.deb`，同一目录下还有 `.sha256`
 校验值。deb 按 FHS 安装程序、MuPDF 共享库、桌面项、图标、说明书和许可证。
+
+macOS 发行包用 `tools/make-release-macos.sh` 生成
+`dist/MaPdfR-<版本>-macos-arm64.zip`（含 `MaPdfR.app`、说明、许可、
+`SHA256SUMS` 与 `SOURCE-INFO.txt`）及 `.sha256`，同样不含源码。
 
 ## PDF 转 Markdown
 

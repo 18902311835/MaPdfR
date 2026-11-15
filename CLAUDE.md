@@ -45,6 +45,26 @@ tools/make-deb-linux.sh                                   # 构建 + 测试 + cp
   `~/.local/bin/cmake`；无显示环境测试用 `xvfb-run -a ctest`。
 - 静态 Qt 需要静态 OpenSSL：配置时传 `-DOPENSSL_ROOT_DIR=/data/qt-static-deps/openssl`。
 
+macOS（Apple Silicon）构建：
+
+```sh
+tools/build-mupdf-macos.sh /path/to/mupdf-1.27.2-source  # build/shared-release/libmupdf.dylib
+tools/build-macos.sh                                      # 配置 + 编译 + offscreen ctest
+tools/make-release-macos.sh                               # dist/MaPdfR-<版本>-macos-arm64.zip
+```
+
+- 默认用静态 Qt `/Volumes/usb1tb/Qt/6.11.1/macos-static`，最低 macOS 13。
+- 与 Linux 一样用 MuPDF 动态库隔离 PDFium 的 libjpeg/zlib/lcms2 副本；
+  dylib 的 install_name 是 `@rpath/libmupdf.dylib`，随 `.app` 放
+  `Contents/Frameworks`。**任何 install_name_tool 改动后必须重新
+  `codesign --force --sign -`**，否则 arm64 上无法加载。
+- 静态 Qt 没有自动链接控件，`qcocoa`（窗口）与 `qoffscreen`（无窗口测试）
+  由 `qt_import_plugins` 链入；ssh 会话跑 ctest 要 `QT_QPA_PLATFORM=offscreen`。
+- macOS 的文件关联走 LaunchServices（bundle id `cn.madeyou.mapdfr`），
+  没有可隔离的测试子树，冒烟测试里该项 `QSKIP`。
+- 应用包由 `cmake/mapdfr-info.plist.in` 生成 Info.plist，
+  图标是 `resources/macos/mapdfr.icns`（由 `resources/linux/icons` 生成）。
+
 - 全部代码用 **MSVC + `/MT`**（静态 Qt 的要求，也是 MuPDF 静态库的要求）。
 - 版本号唯一来源是 `CMakeLists.txt` 的 `project(MaPdfR VERSION …)`；通过
   `MAPDFR_APP_VERSION` 编译定义传给 `main.cpp`、`AboutDialog`，同时用于
@@ -76,6 +96,9 @@ tools/make-deb-linux.sh                                   # 构建 + 测试 + cp
 | `resources/pdf.ico` | `.pdf` 文件类型图标（16–256），注册表 DefaultIcon 引用 |
 | `tools/make-release.{bat,ps1}` | 发行打包：运行时 EXE + 文档 + SHA256；`-WithSource` 另出独立源码包 |
 | `tools/build-mupdf-linux.sh` | Linux 用 MuPDF Makefile 构建 `libmupdf.so`（lcms2 前缀、`-Bsymbolic`） |
+| `tools/build-mupdf-macos.sh` | macOS 构建 `libmupdf.dylib`（install_name `@rpath/`、ad-hoc 签名） |
+| `tools/build-macos.sh`、`tools/make-release-macos.sh` | macOS 构建 + 离屏测试 + `.app` 发行包 |
+| `cmake/mapdfr-info.plist.in`、`resources/macos/mapdfr.icns` | macOS 应用包 Info.plist 与图标 |
 | `tools/make-deb-linux.sh`、`tools/deb/` | 麒麟/Linux 构建 + cpack DEB 打包与 postinst/postrm |
 | `tools/make-tar-linux.sh` | 免安装 tar.gz 便携包（`./mapdfr` 直接运行，可选 `install-user.sh`） |
 | `resources/linux/mapdfr.desktop`、`resources/linux/icons/` | Linux 桌面启动项与 16–256 像素启动器图标 |
@@ -152,8 +175,10 @@ tools/make-deb-linux.sh                                   # 构建 + 测试 + cp
 `.sha256`，作为独立附件发布。静态 Qt 的重链接脚本随源码提供，正式发布包仍需
 加入全部目标文件、库清单和 MuPDF 静态库，并从发行目录执行重链接测试。
 
-麒麟/Windows 运行时包都不放源码：deb 与 tar.gz 只含程序、MuPDF 共享库、
-桌面项、图标和文档。
+麒麟/Windows/macOS 运行时包都不放源码：deb、tar.gz 与 macOS zip 只含程序、
+MuPDF 共享库、桌面项/应用包、图标和文档。macOS 包由
+`tools/make-release-macos.sh` 生成，`libmupdf.dylib` 在
+`MaPdfR.app/Contents/Frameworks`，安装后统一 ad-hoc 签名。
 
 `pdf.ico` 由 CMake POST_BUILD 复制到 EXE 旁；注册表 `DefaultIcon` 引用它，
 缺失时从 `:/pdf.ico` 释放到 `AppLocalDataLocation`，再回退 `MaPdfR.exe,0`。

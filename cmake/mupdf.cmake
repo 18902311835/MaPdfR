@@ -74,6 +74,33 @@ if(UNIX AND NOT APPLE)
     return()
 endif()
 
+# ---- macOS：MuPDF 自带 Makefile 构建的 libmupdf.dylib ----
+# 与 Linux 同理用共享库隔离 MuPDF 自带的 libjpeg/zlib/libpng 和 Qt6Pdf
+# 内 PDFium 的副本。dylib 的 install_name 由 tools/build-mupdf-macos.sh
+# 改成 @rpath/libmupdf.dylib，应用包把它放进 Contents/Frameworks。
+if(APPLE)
+    set(MAPDFR_MUPDF_BUILD_DIR "${MUPDF_SOURCE_DIR}/build/shared-release"
+        CACHE PATH "Directory containing libmupdf.dylib produced by MuPDF's Makefile")
+
+    function(mapdfr_add_mupdf)
+        if(NOT EXISTS "${MAPDFR_MUPDF_BUILD_DIR}/libmupdf.dylib")
+            message(FATAL_ERROR
+                "MuPDF dynamic library not found: ${MAPDFR_MUPDF_BUILD_DIR}/libmupdf.dylib. "
+                "Build it with tools/build-mupdf-macos.sh or set MAPDFR_MUPDF_BUILD_DIR.")
+        endif()
+
+        add_library(mapdfr_mupdf_external SHARED IMPORTED GLOBAL)
+        set_target_properties(mapdfr_mupdf_external PROPERTIES
+            IMPORTED_LOCATION "${MAPDFR_MUPDF_BUILD_DIR}/libmupdf.dylib"
+            INTERFACE_INCLUDE_DIRECTORIES "${MUPDF_SOURCE_DIR}/include")
+    endfunction()
+
+    function(mapdfr_link_mupdf target)
+        target_link_libraries(${target} PRIVATE mapdfr_mupdf_external)
+    endfunction()
+    return()
+endif()
+
 if(NOT (WIN32 AND MSVC))
     set(MAPDFR_MUPDF_LIBRARY "" CACHE FILEPATH "Path to a prebuilt MuPDF 1.27.2 shared library")
 

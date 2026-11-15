@@ -19,14 +19,21 @@
 #include <windows.h>
 #include <shellapi.h>
 #include <shlobj.h>
+#elif defined(Q_OS_MACOS)
+#include <CoreServices/CoreServices.h>
 #endif
 
 namespace MaPdfRFileType {
 
 namespace {
 
+#ifdef _WIN32
 const wchar_t kProgId[] = L"MaPdfR.PDFDocument";
 const wchar_t kAppName[] = L"MaPdfR";
+#elif defined(Q_OS_MACOS)
+// 与 cmake/mapdfr-info.plist.in 的 CFBundleIdentifier 保持一致。
+const char kMacBundleId[] = "cn.madeyou.mapdfr";
+#endif
 
 #ifdef _WIN32
 QString join(const QString &base, const QString &child)
@@ -178,6 +185,94 @@ QString iconReference(const QString &exePath, const QString &iconPath)
     return QStringLiteral("\"%1\",0").arg(QDir::toNativeSeparators(exePath));
 }
 
+#elif defined(Q_OS_MACOS)
+
+// macOS 的 PDF 关联由 LaunchServices 管理：应用包在 Info.plist 里声明
+// PDF 文档类型，用户可以在 Finder 的「显示简介 → 打开方式」里选择，
+// 程序侧只能登记应用包并切换系统记录的默认处理程序。
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
+CFStringRef macPdfContentType()
+{
+    return CFSTR("com.adobe.pdf");
+}
+
+CFStringRef macBundleId()
+{
+    return CFSTR("cn.madeyou.mapdfr");
+}
+
+QString fromCFString(CFStringRef text)
+{
+    if (!text)
+        return QString();
+
+    char buffer[1024];
+
+    if (!CFStringGetCString(text, buffer, sizeof buffer, kCFStringEncodingUTF8))
+        return QString();
+
+    return QString::fromUtf8(buffer);
+}
+
+QString currentPdfHandler()
+{
+    const CFStringRef handler =
+        LSCopyDefaultRoleHandlerForContentType(macPdfContentType(), kLSRolesAll);
+
+    if (!handler)
+        return QString();
+
+    const QString result = fromCFString(handler);
+    CFRelease(handler);
+    return result;
+}
+
+// 把当前 .app 登记到 LaunchServices，Finder 的「打开方式」才会出现它。
+bool registerBundle(QString &error)
+{
+    CFBundleRef bundle = CFBundleGetMainBundle();
+
+    if (!bundle) {
+        error = QStringLiteral("当前进程没有应用包，请从 MaPdfR.app 内运行。");
+        return false;
+    }
+
+    CFURLRef url = CFBundleCopyBundleURL(bundle);
+
+    if (!url) {
+        error = QStringLiteral("无法确定 MaPdfR.app 的位置。");
+        return false;
+    }
+
+    const Boolean ok = LSRegisterURL(url, true);
+    CFRelease(url);
+
+    if (!ok) {
+        error = QStringLiteral("LaunchServices 拒绝登记 MaPdfR.app。");
+        return false;
+    }
+
+    return true;
+}
+
+bool setDefaultHandler(CFStringRef handler, QString &error)
+{
+    const OSStatus status =
+        LSSetDefaultRoleHandlerForContentType(macPdfContentType(), kLSRolesAll, handler);
+
+    if (status != noErr) {
+        error = QStringLiteral("无法写入 LaunchServices 的默认处理程序（错误 %1）。")
+                    .arg(status);
+        return false;
+    }
+
+    return true;
+}
+
+#pragma clang diagnostic pop
+
 #else // !_WIN32
 
 // freedesktop.org 的桌面项标识与 MIME 类型。桌面项安装到
@@ -301,6 +396,8 @@ QString progId()
 {
 #ifdef _WIN32
     return QString::fromWCharArray(kProgId);
+#elif defined(Q_OS_MACOS)
+    return QString::fromLatin1(kMacBundleId);
 #else
     return QString::fromLatin1(kDesktopFileId);
 #endif
@@ -339,6 +436,13 @@ RegistrationStatus query(const QString &exePath, const RegistryScope &scope)
         status.registered =
             status.command.compare(openCommand(exePath), Qt::CaseInsensitive) == 0;
     }
+#elif defined(Q_OS_MACOS)
+    Q_UNUSED(exePath);
+    Q_UNUSED(scope);
+    status.friendlyName = QStringLiteral("PDF 文档");
+    // command 是 LaunchServices 记录的 PDF 默认程序（bundle id）。
+    status.command = currentPdfHandler();
+    status.registered = status.command == progId();
 #else
     Q_UNUSED(exePath);
     Q_UNUSED(scope);
@@ -409,6 +513,13 @@ bool registerPdfType(const QString &exePath, const QString &iconPath,
 
     notifyShell();
     return true;
+#elif defined(Q_OS_MACOS)
+    Q_UNUSED(scope);
+    Q_UNUSED(exePath);
+    Q_UNUSED(iconPath);
+    // 应用包登记到 LaunchServices 后，Finder 的「打开方式」就会列出
+    // MaPdfR；默认程序在用户确认后由 openWithDialog() 切换。
+    return registerBundle(error);
 #else
     Q_UNUSED(scope);
 
@@ -488,6 +599,14 @@ bool unregisterPdfType(QString &error, const RegistryScope &scope)
 
     notifyShell();
     return true;
+#elif defined(Q_OS_MACOS)
+    Q_UNUSED(scope);
+
+    // 只在当前默认程序是 MaPdfR 时清除，不动用户选择的其它程序。
+    if (currentPdfHandler() != progId())
+        return true;
+
+    return setDefaultHandler(nullptr, error);
 #else
     Q_UNUSED(scope);
 
@@ -550,6 +669,24 @@ bool openWithDialog(QString &error)
 
     notifyShell();
     return true;
+#elif defined(Q_OS_MACOS)
+    // macOS 没有「打开方式」对话框；等价操作是把当前应用包写成 PDF 的
+    // 默认处理程序（Finder 的「显示简介 → 打开方式」会同步显示）。
+    if (!registerBundle(error))
+        return false;
+
+    if (!setDefaultHandler(macBundleId(), error))
+        return false;
+
+    if (currentPdfHandler() != progId()) {
+        error = QStringLiteral(
+            "LaunchServices 已接受请求，但系统仍把其它程序记为 PDF 默认程序；"
+            "请在 Finder 中对 PDF 选择「显示简介 → 打开方式 → MaPdfR」，"
+            "或使用「全部更改」。");
+        return false;
+    }
+
+    return true;
 #else
     // Linux 没有统一的「打开方式」对话框，等价操作是直接把本程序设为
     // application/pdf 的默认处理程序（写入 ~/.config/mimeapps.list）。
@@ -598,6 +735,11 @@ bool openDefaultAppsSettings(QString &error)
     }
 
     return true;
+#elif defined(Q_OS_MACOS)
+    error = QStringLiteral(
+        "请在 Finder 中右键 PDF 文件 → 显示简介 → 打开方式，"
+        "选择 MaPdfR 并点「全部更改」。");
+    return false;
 #else
     error = QStringLiteral(
         "请在系统设置 → 默认应用中选择 PDF 的打开程序。");
@@ -648,6 +790,12 @@ bool selfTest(QString &error)
 
     cleanup();
     return true;
+#elif defined(Q_OS_MACOS)
+    Q_UNUSED(error);
+    // macOS 的关联记录在 LaunchServices 的系统数据库里，没有像 Windows
+    // 注册表那样的隔离子树；测试不去改用户真实的默认程序。
+    error = QStringLiteral("macOS 的 LaunchServices 关联无法隔离自测");
+    return false;
 #else
     Q_UNUSED(error);
     // 注册表隔离自测只对 Windows 有意义；Linux 的关联由桌面项和

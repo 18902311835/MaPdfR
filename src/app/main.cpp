@@ -3,10 +3,45 @@
 
 #include <QApplication>
 #include <QFileInfo>
+#ifdef Q_OS_MACOS
+#include <QFileOpenEvent>
+#endif
 #include <QIcon>
 #include <QMessageBox>
 #include <QStringList>
 #include <QTranslator>
+
+#ifdef Q_OS_MACOS
+namespace {
+
+// Finder 把「打开方式」请求作为 QFileOpenEvent 发给应用（包括已经
+// 在运行的实例），而不是命令行参数。
+class MacOpenEventFilter : public QObject
+{
+public:
+    explicit MacOpenEventFilter(PdfWorkspace* workspace)
+        : m_workspace(workspace)
+    {
+    }
+
+protected:
+    bool eventFilter(QObject* watched, QEvent* event) override
+    {
+        if (event->type() == QEvent::FileOpen) {
+            const QString path = static_cast<QFileOpenEvent*>(event)->file();
+            if (!path.isEmpty())
+                m_workspace->requestOpen({path});
+            return true;
+        }
+        return QObject::eventFilter(watched, event);
+    }
+
+private:
+    PdfWorkspace* m_workspace;
+};
+
+} // namespace
+#endif
 
 int main(int argc, char* argv[])
 {
@@ -55,6 +90,10 @@ int main(int argc, char* argv[])
 
     PdfWorkspace workspace;
     QObject::connect(&relay, &LocalOpenRelay::openRequested, &workspace, &PdfWorkspace::requestOpen);
+#ifdef Q_OS_MACOS
+    MacOpenEventFilter macOpenEvents(&workspace);
+    app.installEventFilter(&macOpenEvents);
+#endif
     workspace.show();
     if (!files.isEmpty())
         workspace.requestOpen(files);

@@ -470,6 +470,10 @@ void ReaderSmoke::pdfTypeRegistrationSelfTest()
     QString error;
 
     QVERIFY2(MaPdfRFileType::selfTest(error), qPrintable(error));
+#elif defined(Q_OS_MACOS)
+    // macOS 的关联记录在 LaunchServices 系统数据库里，没有可隔离的
+    // 测试子树，不能为了测试去改用户真实的 PDF 默认程序。
+    QSKIP("LaunchServices association test");
 #elif defined(Q_OS_LINUX)
     // Linux 的关联由用户桌面项（.desktop）和 mimeapps.list 决定。
     // 全部写入临时 XDG 目录，不触碰真实的用户配置。

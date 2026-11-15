@@ -69,6 +69,26 @@ endif()
 # qpdf 是 Qt PDF 的图像格式插件（QImageReader 读 PDF 页），
 # 缺了它 QPdfView 仍可显示，但「另存为图片」一类的路径会失效。
 function(mapdfr_link_static_plugins target)
+    if(APPLE)
+        if(MAPDFR_QT_IS_STATIC)
+            # macOS 静态 Qt：qcocoa 是唯一的窗口平台插件；offscreen 让
+            # ctest 在没有窗口会话（ssh）时也能跑。图像格式插件与
+            # Windows 列表对应。
+            qt_import_plugins(${target}
+                INCLUDE
+                    Qt6::QCocoaIntegrationPlugin
+                    Qt6::QOffscreenIntegrationPlugin
+                    Qt6::QICOPlugin
+                    Qt6::QICNSPlugin
+                    Qt6::QJpegPlugin
+                    Qt6::QGifPlugin
+                    Qt6::QSvgPlugin
+                    Qt6::QSvgIconPlugin
+                    Qt6::QPdfPlugin)
+        endif()
+        return()
+    endif()
+
     if(NOT (WIN32 AND MAPDFR_QT_IS_STATIC))
         return()
     endif()
@@ -164,7 +184,33 @@ if(WIN32)
     list(APPEND MAPDFR_APP_SOURCES "${CMAKE_CURRENT_BINARY_DIR}/mapdfr-app.rc")
 endif()
 
+if(APPLE)
+    # macOS 应用包：Info.plist 声明 PDF 文档类型，Finder 里 .pdf 的
+    # 「打开方式」才会列出 MaPdfR；图标用 iconutil 生成的 .icns。
+    set_source_files_properties(
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/macos/mapdfr.icns"
+        PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
+    list(APPEND MAPDFR_APP_SOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/macos/mapdfr.icns")
+
+    add_executable(MaPdfR MACOSX_BUNDLE ${MAPDFR_APP_SOURCES})
+
+    set_target_properties(MaPdfR PROPERTIES
+        MACOSX_BUNDLE_BUNDLE_NAME "MaPdfR"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "cn.madeyou.mapdfr"
+        MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_ICON_FILE "mapdfr.icns"
+        MACOSX_BUNDLE_INFO_PLIST
+            "${CMAKE_CURRENT_SOURCE_DIR}/cmake/mapdfr-info.plist.in"
+        # MuPDF 的 dylib 随包放在 Contents/Frameworks。
+        BUILD_RPATH "${MAPDFR_MUPDF_BUILD_DIR}"
+        # 让构建树与安装后的 .app 都能找到 Contents/Frameworks 下的副本。
+        # 用链接选项而不是 INSTALL_RPATH，避免安装时重复添加同一条 rpath。
+        LINK_OPTIONS "-Wl,-rpath,@executable_path/../Frameworks")
+else()
 add_executable(MaPdfR WIN32 ${MAPDFR_APP_SOURCES})
+endif()
 
 # Linux：安装后的二进制叫 mapdfr（与 .desktop 的 Exec 一致），
 # MuPDF 共享库放在 /usr/lib/mapdfr，运行时通过相对 RPATH 找到。
@@ -207,7 +253,22 @@ if(MAPDFR_WITH_MUPDF)
     mapdfr_link_mupdf(MaPdfR)
 endif()
 
+# macOS：PDF 关联走 LaunchServices（CoreServices 框架）。
+if(APPLE)
+    target_link_libraries(MaPdfR PRIVATE "-framework CoreServices")
+endif()
+
 mapdfr_link_static_plugins(MaPdfR)
+
+# macOS：把 libmupdf.dylib 拷进 MaPdfR.app/Contents/Frameworks 并重新签名。
+if(APPLE AND MAPDFR_WITH_MUPDF AND EXISTS "${MAPDFR_MUPDF_BUILD_DIR}/libmupdf.dylib")
+    add_custom_command(TARGET MaPdfR POST_BUILD
+        COMMAND ${CMAKE_COMMAND}
+            "-DAPP_BUNDLE=$<TARGET_BUNDLE_DIR:MaPdfR>"
+            "-DMUPDF_DYLIB=${MAPDFR_MUPDF_BUILD_DIR}/libmupdf.dylib"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/macos-bundle-mupdf.cmake"
+        COMMENT "Bundling libmupdf.dylib into MaPdfR.app")
+endif()
 
 # Qt 自带对话框（取消 / 打开 / 另存为 / 错误提示）的中文翻译。
 # 嵌进资源而不是随包放 translations/，静态构建仍是一个自包含的 EXE。
@@ -220,18 +281,25 @@ elseif(NOT IS_ABSOLUTE "${_mapdfr_qt_translations}")
     # Qt 的 QtInstallPaths.cmake 把它定义为相对安装前缀的 "translations"。
     set(_mapdfr_qt_translations "${QT6_INSTALL_PREFIX}/${_mapdfr_qt_translations}")
 endif()
-if(EXISTS "${_mapdfr_qt_translations}/qtbase_zh_CN.qm")
+set(_mapdfr_qt_qm "${_mapdfr_qt_translations}/qtbase_zh_CN.qm")
+if(NOT EXISTS "${_mapdfr_qt_qm}")
+    # 自建的静态 Qt（如 macOS 上的 macos-static）常常没装 translations，
+    # 仓库里带一份同版本 qtbase_zh_CN.qm 作为回退。
+    set(_mapdfr_qt_qm
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/i18n/qtbase_zh_CN.qm")
+endif()
+if(EXISTS "${_mapdfr_qt_qm}")
     # qt_add_resources 不接受绝对路径，先复制到构建树再按 BASE 计算资源名。
     set(_mapdfr_qm_dir "${CMAKE_CURRENT_BINARY_DIR}/i18n")
-    file(COPY "${_mapdfr_qt_translations}/qtbase_zh_CN.qm"
+    file(COPY "${_mapdfr_qt_qm}"
          DESTINATION "${_mapdfr_qm_dir}")
     qt_add_resources(MaPdfR "translations"
         PREFIX "/i18n"
         BASE "${_mapdfr_qm_dir}"
         FILES "${_mapdfr_qm_dir}/qtbase_zh_CN.qm")
-    message(STATUS ">>> Embedded Qt Chinese translation: ${_mapdfr_qt_translations}/qtbase_zh_CN.qm")
+    message(STATUS ">>> Embedded Qt Chinese translation: ${_mapdfr_qt_qm}")
 else()
-    message(STATUS ">>> qtbase_zh_CN.qm not found under ${_mapdfr_qt_translations}; Qt standard dialogs stay untranslated")
+    message(STATUS ">>> qtbase_zh_CN.qm not found; Qt standard dialogs stay untranslated")
 endif()
 
 # === 冒烟测试 ===
@@ -271,6 +339,12 @@ if(MAPDFR_BUILD_TESTS)
         mapdfr_link_mupdf(mapdfr_reader_tests)
     endif()
 
+    if(APPLE)
+        target_link_libraries(mapdfr_reader_tests PRIVATE "-framework CoreServices")
+        set_target_properties(mapdfr_reader_tests PROPERTIES
+            BUILD_RPATH "${MAPDFR_MUPDF_BUILD_DIR}")
+    endif()
+
     mapdfr_link_static_plugins(mapdfr_reader_tests)
 
     add_test(NAME MaPdfR.ReaderSmoke COMMAND mapdfr_reader_tests)
@@ -298,6 +372,16 @@ if(MAPDFR_BUILD_TESTS)
             Qt6::Test)
 
         mapdfr_link_mupdf(mapdfr_markdown_tests)
+        if(APPLE)
+            # 静态 Qt 的 QGuiApplication 需要平台插件；ctest 在 ssh 会话里用
+            # offscreen，所以这里和阅读器测试一样链入插件集合。
+            mapdfr_link_static_plugins(mapdfr_markdown_tests)
+        endif()
+
+        if(APPLE)
+            set_target_properties(mapdfr_markdown_tests PROPERTIES
+                BUILD_RPATH "${MAPDFR_MUPDF_BUILD_DIR}")
+        endif()
 
         add_test(NAME MaPdfR.MarkdownExport COMMAND mapdfr_markdown_tests)
         set_tests_properties(MaPdfR.MarkdownExport PROPERTIES TIMEOUT 120)
@@ -380,4 +464,11 @@ else()
             install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/${_mapdfr_notice}" DESTINATION .)
         endif()
     endforeach()
+
+    # macOS：MuPDF 动态库进应用包的 Contents/Frameworks；说明书与许可
+    # 放在 .app 外（codesign 后修改包内容会破坏签名）。
+    if(APPLE AND MAPDFR_WITH_MUPDF)
+        install(FILES "${MAPDFR_MUPDF_BUILD_DIR}/libmupdf.dylib"
+            DESTINATION "MaPdfR.app/Contents/Frameworks")
+    endif()
 endif()

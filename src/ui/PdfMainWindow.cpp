@@ -1131,6 +1131,10 @@ void PdfMainWindow::onUnregisterPdfType()
     const QString question =
         tr("将从当前用户注册表删除 MaPdfR 的 PDF 文件类型注册。\n"
            "已有的 PDF 文件不会被删除或修改。是否继续？");
+#elif defined(Q_OS_MACOS)
+    const QString question =
+        tr("将取消 MaPdfR 作为 PDF 默认打开程序的登记。\n"
+           "已有的 PDF 文件不会被删除或修改。是否继续？");
 #else
     const QString question =
         tr("将删除 MaPdfR 的用户桌面项，并从 PDF 的关联列表中移除。\n"
@@ -1187,6 +1191,10 @@ void PdfMainWindow::onSetDefaultPdfApp()
         const QString hint =
             tr("也可以在 Windows「设置 → 应用 → 默认应用」中"
                "手动为 .pdf 选择 MaPdfR。");
+#elif defined(Q_OS_MACOS)
+        const QString hint =
+            tr("也可以在 Finder 中右键 PDF 文件 → 显示简介 → 打开方式，"
+               "选择 MaPdfR 并点「全部更改」。");
 #else
         const QString hint =
             tr("也可以在系统设置的「默认应用」中手动为 PDF 选择 MaPdfR。");

@@ -237,6 +237,8 @@ AboutDialog::AboutDialog(QWidget* parent, Page initialPage)
         tr("版本 %1").arg(QStringLiteral(MAPDFR_APP_VERSION)), this);
 #ifdef Q_OS_WIN
     const QString description = tr("Windows 独立 PDF 查看器 · 作者 马德有");
+#elif defined(Q_OS_MACOS)
+    const QString description = tr("macOS 独立 PDF 查看器 · 作者 马德有");
 #else
     const QString description = tr("Linux 独立 PDF 查看器 · 作者 马德有");
 #endif
