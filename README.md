@@ -1,5 +1,7 @@
 # MaPdfR — 独立 PDF 阅读器
 
+MaPdfR 1.0.0 —— Windows 与麒麟（Linux aarch64）独立 PDF 阅读器（Qt 6.11.1 静态构建）。查找、打印、便笺与 PDF → Markdown 导出；AGPL v3，附源码与重链接材料
+
 MaPdfR 是从作者开发 **QtNotePad 2.36.2** 中提取 PDF 阅读器代码后重新搭建的独立
 Qt 桌面程序。阅读界面基于 Qt 6 的
 `QPdfDocument` / `QPdfView`，文件另存使用 `SafeFileCopy`。
