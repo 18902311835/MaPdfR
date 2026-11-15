@@ -1,9 +1,10 @@
 # CLAUDE.md
 
-MaPdfR：Windows / Linux（麒麟 aarch64）独立 PDF 查看器（Qt 6 静态构建），阅读部分提取自作者的
-QtNotePad 2.36.2；MuPDF 1.27.2 支撑复制权限、打印、便笺和 Markdown 导出。
-阅读器另有查找（`QPdfSearchModel`）、工具栏缩放比例、HKCU PDF 文件类型注册
-与「关于 MaPdfR」窗口。
+MaPdfR：Windows / macOS（Apple Silicon）/ Linux（麒麟 aarch64）独立 PDF 查看器
+（Qt 6 静态构建），阅读部分提取自作者的 QtNotePad 2.36.2；MuPDF 1.27.2 支撑
+复制权限、打印、便笺和 Markdown 导出。阅读器另有查找（`QPdfSearchModel`）、
+工具栏缩放比例、PDF 文件类型注册（Windows HKCU / Linux .desktop / macOS
+LaunchServices）与「关于 MaPdfR」窗口。
 
 ## 构建与测试
 
@@ -74,7 +75,8 @@ tools/make-release-macos.sh                               # dist/MaPdfR-<版本>
     正常 PDF 可加载、缩放标签显示百分比、查找能命中 fixture 文本、
     `MaPdfRFileType::selfTest()` 的隔离注册表往返；Linux 上改为在临时
     `XDG_DATA_HOME` / `XDG_CONFIG_HOME` 里验证 .desktop 写入、`xdg-mime`
-    默认程序写入与注销清理。
+    默认程序写入与注销清理；macOS 该项 `QSKIP`（LaunchServices 无法隔离，
+    测试不得改用户真实的默认程序）。
   - `MaPdfR.MarkdownExport`：PDF → Markdown 的内容断言与 MuPDF/PDFium 共存。
 - `-DMAPDFR_WITH_MUPDF=OFF` 可跳过 MuPDF，保留阅读、导航、搜索、选区高亮和帮助。
 - 正式发行前需把真实链接参数和目标文件接入发行打包，并执行重链接测试。
@@ -135,13 +137,23 @@ tools/make-release-macos.sh                               # dist/MaPdfR-<版本>
 - 二进制在 Linux 上叫 `mapdfr`（`OUTPUT_NAME`），安装 RPATH 为
   `$ORIGIN/../lib/mapdfr`；`QGuiApplication::setDesktopFileName("mapdfr")`
   让窗口归到启动器图标下。
+- macOS 的关联实现：Info.plist 声明 `com.adobe.pdf` 文档类型（角色 Viewer）；
+  注册 = `LSRegisterURL` 登记当前 `.app`；设为默认 = 用 bundle id
+  `cn.madeyou.mapdfr` 调 `LSSetDefaultRoleHandlerForContentType`；取消注册只在
+  当前默认处理程序是 MaPdfR 时清除。Finder 的「打开方式」会产生
+  `QFileOpenEvent`，`main.cpp` 的 `MacOpenEventFilter` 把它转给
+  `PdfWorkspace::requestOpen`（含已运行实例）。
 - 测试依赖的 objectName：`ReaderPageSpin`、`ReaderPdfView`、`ReaderZoomLabel`、
   `ReaderSearchEdit`、`ReaderSearchStatus`、`ReaderFindToolBar`。
 
 ## MuPDF 集成要点
 
-- 源文件清单在 configure 时从 MuPDF 自带的
+- Windows 用静态库：源文件清单在 configure 时从 MuPDF 自带的
   `platform/win32/libmupdf.vcxproj` / `libthirdparty.vcxproj` 解析，不做手工列表。
+- Linux/macOS 用 MuPDF 自带 Makefile 构建的共享库（`libmupdf.so` /
+  `libmupdf.dylib`），两边都用 `-DHAVE_LCMS2MT` + 去掉 `sscanf` 的 lcms2
+  前缀头；macOS 的产物在 `build/shared-release`，由
+  `tools/build-mupdf-macos.sh` 生成。
 - 只启用 PDF：`FZ_ENABLE_JS/XPS/SVG/CBZ/IMG/HTML/EPUB/FB2/MOBI/TXT/OFFICE/
   BARCODE/OCR/DOCX/ODT = 0`，`TOFU` + `TOFU_CJK` 只保留 Base14 字体。
 - 字体资源由 `scripts/bin2coff.c` 生成 COFF `.obj`，符号名
@@ -180,6 +192,20 @@ MuPDF 共享库、桌面项/应用包、图标和文档。macOS 包由
 `tools/make-release-macos.sh` 生成，`libmupdf.dylib` 在
 `MaPdfR.app/Contents/Frameworks`，安装后统一 ad-hoc 签名。
 
+发布渠道（1.0.0 的既有做法，换版本时照此同步）：
+
+- GitHub Release <https://github.com/18902311835/MaPdfR/releases>：
+  资产以 `MaPdfR-<版本>-...` 命名（`windows-x64.zip`、`macos-arm64.zip`、
+  `linux-aarch64.tar.gz`、`source.zip`，以及麒麟的 `mapdfr_<版本>_arm64.deb`），
+  每个包配 `.sha256`。MuPDF 源码保留自身版本名
+  `MuPDF-1.27.2-source.zip`，不要改成发行版本号。
+- 网站 <https://www.madeyou.cn/software/> 由服务器的
+  `ecshop/software/` 提供，只放运行包与校验值；`site/software/index.html`
+  是下载页源码副本。上传后在该目录用 `sha256sum -c` 核对。
+- 改版本需要同时更新：`CMakeLists.txt` 的版本、下载页、GitHub Release
+  资产和服务器上的包。GitHub 的 Packages 计数与 Release 附件无关，保持 0
+  属正常。
+
 `pdf.ico` 由 CMake POST_BUILD 复制到 EXE 旁；注册表 `DefaultIcon` 引用它，
 缺失时从 `:/pdf.ico` 释放到 `AppLocalDataLocation`，再回退 `MaPdfR.exe,0`。
 
@@ -197,9 +223,11 @@ MuPDF 共享库、桌面项/应用包、图标和文档。macOS 包由
 - 本工程以 **GNU AGPL v3** 发布，源码托管在
   <https://github.com/18902311835/MaPdfR>；`LICENSE.txt` 是 AGPL v3 全文，
   `COPYRIGHT.md` 记录版权与第三方组件摘要。不要擅自改许可证文本。
-- MuPDF 同为 **AGPL v3**，静态链接进 `MaPdfR.exe`，因此整份二进制按
-  AGPL v3 提供源码。正式发行前核验 MuPDF 对应源码和获取方式。
-- Qt 是 **LGPL v3 + 静态链接**：发行包必须保留 `source\relink\` 目标文件与
-  `licenses\LGPL-3.0.txt`、`GPL-3.0.txt`；不要删除这两部分。
+- MuPDF 同为 **AGPL v3**：Windows 版静态链接进 `MaPdfR.exe`，Linux/macOS 版
+  随包分发 `libmupdf.so` / `libmupdf.dylib`；两种情况整份二进制都按 AGPL v3
+  提供源码。正式发行前核验 MuPDF 对应源码和获取方式。
+- Qt 是 **LGPL v3 + 静态链接**（Windows EXE 与 macOS `.app`）：发行包必须保留
+  `source\relink\` 目标文件与 `licenses\LGPL-3.0.txt`、`GPL-3.0.txt`；不要删除
+  这两部分。macOS 包目前随附许可文本，重链接材料仍需按实际 Qt 版本补齐。
 - 第三方组件变动时同步更新 `THIRD_PARTY.md`、`COPYRIGHT.md`、README
   的已知限制与关于窗口的第三方页面。
