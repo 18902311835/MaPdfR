@@ -1,6 +1,6 @@
 # MaPdfR — 独立 PDF 阅读器
 
-MaPdfR 是从 **QtNotePad 2.36.2** 中提取 PDF 阅读器代码后重新搭建的独立
+MaPdfR 是从作者开发 **QtNotePad 2.36.2** 中提取 PDF 阅读器代码后重新搭建的独立
 Qt 桌面程序。阅读界面基于 Qt 6 的
 `QPdfDocument` / `QPdfView`，文件另存使用 `SafeFileCopy`。
 
