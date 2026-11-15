@@ -43,6 +43,37 @@ function(mapdfr_mupdf_collect_sources vcxproj out_var)
     set(${out_var} "${_files}" PARENT_SCOPE)
 endfunction()
 
+# ---- Linux：使用 MuPDF 自带 Makefile 构建出的共享库 ----
+# 字体嵌入由 MuPDF 的 Makefile 通过 HAVE_OBJCOPY 完成（符号名
+# _binary_resources_fonts_*），与 Windows 的 bin2coff 方案不同，不能复用。
+#
+# 用共享库而不是静态库，是因为静态链接时 MuPDF 自带的 libjpeg / zlib /
+# libpng 等会与 Qt6Pdf 里 PDFium 的副本重复定义（jpeg_natural_order 等），
+# 链接器直接报 multiple definition。libmupdf.so 用 -Bsymbolic 构建，内部
+# 引用绑定到自己的副本，不会与 PDFium 互相抢占。
+if(UNIX AND NOT APPLE)
+    set(MAPDFR_MUPDF_BUILD_DIR "${MUPDF_SOURCE_DIR}/build/release"
+        CACHE PATH "Directory containing libmupdf.so produced by MuPDF's Makefile")
+
+    function(mapdfr_add_mupdf)
+        if(NOT EXISTS "${MAPDFR_MUPDF_BUILD_DIR}/libmupdf.so")
+            message(FATAL_ERROR
+                "MuPDF shared library not found: ${MAPDFR_MUPDF_BUILD_DIR}/libmupdf.so. "
+                "Build it with tools/build-mupdf-linux.sh or set MAPDFR_MUPDF_BUILD_DIR.")
+        endif()
+
+        add_library(mapdfr_mupdf_external SHARED IMPORTED GLOBAL)
+        set_target_properties(mapdfr_mupdf_external PROPERTIES
+            IMPORTED_LOCATION "${MAPDFR_MUPDF_BUILD_DIR}/libmupdf.so"
+            INTERFACE_INCLUDE_DIRECTORIES "${MUPDF_SOURCE_DIR}/include")
+    endfunction()
+
+    function(mapdfr_link_mupdf target)
+        target_link_libraries(${target} PRIVATE mapdfr_mupdf_external m pthread dl)
+    endfunction()
+    return()
+endif()
+
 if(NOT (WIN32 AND MSVC))
     set(MAPDFR_MUPDF_LIBRARY "" CACHE FILEPATH "Path to a prebuilt MuPDF 1.27.2 shared library")
 
