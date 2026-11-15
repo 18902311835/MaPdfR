@@ -1,0 +1,5 @@
+# Linux 脚本与桌面项必须是 LF：CRLF 会让 bash 和 .desktop 解析失败。
+*.sh text eol=lf
+*.desktop text eol=lf
+tools/deb/postinst text eol=lf
+tools/deb/postrm text eol=lf
