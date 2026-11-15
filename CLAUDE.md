@@ -74,7 +74,7 @@ tools/make-deb-linux.sh                                   # 构建 + 测试 + cp
 | `src/app/FileAssociation.{h,cpp}` | HKCU PDF 文件类型注册 / 系统「打开方式」对话框 |
 | `src/ui/AboutDialog.{h,cpp}` | 关于窗口：关于 / 第三方组件 / 版权与许可 |
 | `resources/pdf.ico` | `.pdf` 文件类型图标（16–256），注册表 DefaultIcon 引用 |
-| `tools/make-release.{bat,ps1}` | 发行打包：EXE + 文档 + 工程源码 + 可重新链接材料 + SHA256 |
+| `tools/make-release.{bat,ps1}` | 发行打包：运行时 EXE + 文档 + SHA256；`-WithSource` 另出独立源码包 |
 | `tools/build-mupdf-linux.sh` | Linux 用 MuPDF Makefile 构建 `libmupdf.so`（lcms2 前缀、`-Bsymbolic`） |
 | `tools/make-deb-linux.sh`、`tools/deb/` | 麒麟/Linux 构建 + cpack DEB 打包与 postinst/postrm |
 | `tools/make-tar-linux.sh` | 免安装 tar.gz 便携包（`./mapdfr` 直接运行，可选 `install-user.sh`） |
@@ -146,11 +146,14 @@ tools/make-deb-linux.sh                                   # 构建 + 测试 + cp
 
 ## 发行打包
 
-`tools\make-release.bat` 输出 `dist\MaPdfR-<版本>\`：
+`tools\make-release.bat` 输出运行时包 `dist\MaPdfR-<版本>\`（程序、说明书、
+许可证、`SOURCE-INFO.txt` 与校验值），**不含源代码**。加 `-WithSource` 时另外
+在 `dist\` 生成 `MaPdfR-<版本>-source.zip`、`MuPDF-1.27.2-source.zip` 及
+`.sha256`，作为独立附件发布。静态 Qt 的重链接脚本随源码提供，正式发布包仍需
+加入全部目标文件、库清单和 MuPDF 静态库，并从发行目录执行重链接测试。
 
-`make-release` 生成程序、说明书、许可证、源码包与校验值。它在找到 MuPDF
-源码树时打包源码。静态 Qt 的重链接脚本随源码提供，正式发布包仍需加入全部
-目标文件、库清单和 MuPDF 静态库，并从发行目录执行重链接测试。
+麒麟/Windows 运行时包都不放源码：deb 与 tar.gz 只含程序、MuPDF 共享库、
+桌面项、图标和文档。
 
 `pdf.ico` 由 CMake POST_BUILD 复制到 EXE 旁；注册表 `DefaultIcon` 引用它，
 缺失时从 `:/pdf.ico` 释放到 `AppLocalDataLocation`，再回退 `MaPdfR.exe,0`。

@@ -248,11 +248,12 @@ MaPdfR.exe a.pdf b.pdf              :: 各文件在同一窗口的标签中打�
 
 ```bat
 bld.bat                     :: 先构建并跑测试
-tools\make-release.bat      :: 生成 dist\MaPdfR-<版本>\
-tools\make-release.bat -SkipMuPdfSource   :: 不打包 MuPDF 源码
+tools\make-release.bat      :: 生成运行时包 dist\MaPdfR-<版本>\（不含源码）
+tools\make-release.bat -WithSource   :: 另外在 dist\ 生成源码包
+tools\make-release.bat -WithSource -SkipMuPdfSource   :: 不打包 MuPDF 源码
 ```
 
-发行目录包含：
+发行目录（运行时包）包含：
 
 | 内容 | 说明 |
 |---|---|
@@ -261,8 +262,14 @@ tools\make-release.bat -SkipMuPdfSource   :: 不打包 MuPDF 源码
 | `user-guide.zh_CN.html`、`licenses/` | 离线说明书及随附许可文本 |
 | `SOURCE-INFO.txt` | 第三方组件许可与源码获取 / 重建说明 |
 | `SHA256SUMS.txt` | 逐文件校验值 |
-| `source\MaPdfR-<版本>-source.zip` | 本工程源码、构建脚本与测试 |
-| `source\MuPDF-1.27.2-source.zip` | MuPDF 完整源码（排除 VS 构建中间产物） |
+
+运行时包**不包含源代码**。源码作为独立附件发布：
+
+| 内容 | 说明 |
+|---|---|
+| `dist\MaPdfR-<版本>-source.zip` | 本工程源码、构建脚本与测试 |
+| `dist\MuPDF-1.27.2-source.zip` | MuPDF 完整源码（排除 VS 构建中间产物） |
+| `dist\*.sha256` | 上述源码包的校验值 |
 
 `MUPDF_DIR` 指向的源码树若不存在，脚本会给出警告并跳过 MuPDF 源码包；
 正式发行前由发行方核验对应源码的获取方式、版本与实际构建的一致性。
