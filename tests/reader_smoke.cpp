@@ -31,6 +31,7 @@
 #include <QScreen>
 #include <QScrollBar>
 #include <QSpinBox>
+#include <QStandardPaths>
 #include <QTabWidget>
 #include <QTemporaryDir>
 #include <QTemporaryFile>
@@ -463,14 +464,74 @@ void ReaderSmoke::canceledPasswordDoesNotInterruptQueuedOpen()
 
 void ReaderSmoke::pdfTypeRegistrationSelfTest()
 {
-#ifndef Q_OS_WIN
-    QSKIP("Windows registry test");
-#else
+#if defined(Q_OS_WIN)
     // 注册逻辑只写 HKCU 的隔离子树（Software\MaPdfR\SelfTest\<uuid>），
     // 不会碰真实的 .pdf 关联。
     QString error;
 
     QVERIFY2(MaPdfRFileType::selfTest(error), qPrintable(error));
+#elif defined(Q_OS_LINUX)
+    // Linux 的关联由用户桌面项（.desktop）和 mimeapps.list 决定。
+    // 全部写入临时 XDG 目录，不触碰真实的用户配置。
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+    const QByteArray oldData = qgetenv("XDG_DATA_HOME");
+    const QByteArray oldConfig = qgetenv("XDG_CONFIG_HOME");
+    const QString dataHome = dir.filePath(QStringLiteral("data"));
+    const QString configHome = dir.filePath(QStringLiteral("config"));
+    qputenv("XDG_DATA_HOME", QFile::encodeName(dataHome));
+    qputenv("XDG_CONFIG_HOME", QFile::encodeName(configHome));
+
+    const QString desktopPath = QDir(dataHome).filePath(
+        QStringLiteral("applications/mapdfr.desktop"));
+    const QString exe = QStringLiteral("/usr/bin/mapdfr");
+    QString error;
+
+    QVERIFY2(MaPdfRFileType::registerPdfType(exe, QString(), error),
+             qPrintable(error));
+    QVERIFY(QFileInfo::exists(desktopPath));
+
+    QFile desktop(desktopPath);
+    QVERIFY(desktop.open(QIODevice::ReadOnly));
+    const QString content = QString::fromUtf8(desktop.readAll());
+    desktop.close();
+    QVERIFY(content.contains(QStringLiteral("Exec=\"/usr/bin/mapdfr\" %F")));
+    QVERIFY(content.contains(QStringLiteral("TryExec=/usr/bin/mapdfr")));
+    QVERIFY(content.contains(QStringLiteral("MimeType=application/pdf;")));
+
+    if (!QStandardPaths::findExecutable(QStringLiteral("xdg-mime")).isEmpty()) {
+        // xdg-mime default 把本程序写入临时 mimeapps.list。
+        QVERIFY2(MaPdfRFileType::openWithDialog(error), qPrintable(error));
+        QCOMPARE(MaPdfRFileType::query().command,
+                 QStringLiteral("mapdfr.desktop"));
+    }
+
+    QVERIFY2(MaPdfRFileType::unregisterPdfType(error), qPrintable(error));
+    QVERIFY(!QFileInfo::exists(desktopPath));
+    QVERIFY(MaPdfRFileType::query().command
+            != QStringLiteral("mapdfr.desktop"));
+
+    const QString mimeApps = QDir(configHome).filePath(
+        QStringLiteral("mimeapps.list"));
+
+    if (QFileInfo::exists(mimeApps)) {
+        QFile file(mimeApps);
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QVERIFY(!QString::fromUtf8(file.readAll())
+                     .contains(QStringLiteral("mapdfr.desktop")));
+    }
+
+    if (oldData.isNull())
+        qunsetenv("XDG_DATA_HOME");
+    else
+        qputenv("XDG_DATA_HOME", oldData);
+    if (oldConfig.isNull())
+        qunsetenv("XDG_CONFIG_HOME");
+    else
+        qputenv("XDG_CONFIG_HOME", oldConfig);
+#else
+    QSKIP("Windows registry test");
 #endif
 }
 

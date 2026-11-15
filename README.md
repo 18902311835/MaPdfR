@@ -136,11 +136,46 @@ cmake --build build/linux --parallel
 QT_QPA_PLATFORM=offscreen ctest --test-dir build/linux --output-on-failure
 ```
 
-在 Linux 验证全部功能时设 `MAPDFR_WITH_MUPDF=ON`，并设置
-`MUPDF_SOURCE_DIR` 为 MuPDF 1.27.2 头文件所在源码树、`MAPDFR_MUPDF_LIBRARY` 为
-匹配的共享库。开发库的第三方符号应与 Qt 所用库兼容或隔离。
+### 麒麟 / Linux 完整构建与 deb 打包
 
-产物：`build\msvc2022_64-static\MaPdfR.exe`。
+完整功能需要先用 MuPDF 自带 Makefile 生成共享库 `libmupdf.so`：
+
+```sh
+tools/build-mupdf-linux.sh /path/to/mupdf-1.27.2-source
+```
+
+脚本只编译 PDF 需要的部分，并给 MuPDF 自带的 lcms2 符号加 `mpdf_` 前缀，
+避免与静态 Qt 里 PDFium 的副本冲突。随后构建应用并生成 deb：
+
+```sh
+tools/make-deb-linux.sh
+# 产物：build/linux-deb/mapdfr_<版本>_arm64.deb
+```
+
+默认使用静态 Qt `/data/Qt/6.11.1-aarch64-static`、MuPDF 源码
+`/usb1tb/202611OK/mupdf-1.27.2-source`；可用 `QT_PREFIX`、`MUPDF_DIR`、
+`OPENSSL_ROOT_DIR`、`BUILD_DIR` 覆盖。麒麟 V10 自带的 CMake 3.16 低于
+Qt 6.11 要求的 3.22，脚本会优先使用 `~/.local/bin/cmake`。
+
+应用用共享库 `libmupdf.so` 而不是静态库：静态链接时 MuPDF 自带的
+libjpeg / zlib / libpng 会与 `Qt6Pdf` 里 PDFium 的副本重复定义。共享库以
+`-Bsymbolic` 构建，两边互不干扰。
+
+deb 安装布局：
+
+| 路径 | 内容 |
+|---|---|
+| `/usr/bin/mapdfr` | 主程序（静态 Qt + MuPDF 接口，RPATH `$ORIGIN/../lib/mapdfr`） |
+| `/usr/lib/mapdfr/libmupdf.so.27.2` | MuPDF 运行时库 |
+| `/usr/share/applications/mapdfr.desktop` | 桌面启动项，`MimeType=application/pdf` |
+| `/usr/share/icons/hicolor/*/apps/mapdfr.png` | 16–256 像素启动器图标 |
+| `/usr/share/doc/mapdfr/` | 说明书、README、许可证与第三方组件说明 |
+
+系统依赖由 `dpkg-shlibdeps` 计算（X11 / glib / fontconfig / ICU 等），
+无需安装 Qt 或 MuPDF 的开发包即可运行。无显示环境跑测试时用
+`xvfb-run -a ctest`。
+
+产物（Windows）：`build\msvc2022_64-static\MaPdfR.exe`。
 
 ## 使用
 
@@ -182,6 +217,11 @@ MaPdfR.exe a.pdf b.pdf              :: 各文件在同一窗口的标签中打�
   原有的默认处理程序。
 - 「帮助 → 设为默认 PDF 打开程序…」：注册后调用系统对话框（Windows 8+
   禁止程序静默修改默认程序）。
+- Linux / 麒麟上三个菜单项做对应的事：「注册」把带 `MimeType=application/pdf`
+  的用户桌面项写到 `~/.local/share/applications/mapdfr.desktop`；「取消注册」
+  删除该文件并清理 `~/.config/mimeapps.list` 里的条目；「设为默认」调用
+  `xdg-mime default`。deb 安装的桌面项在 `/usr/share/applications`，同样参与
+  系统的「打开方式」。
 - 「帮助 → 用户说明书」（`F1`）可离线打开中文使用说明。
 - 「帮助 → 关于 MaPdfR…」：版本、构建信息、第三方组件与许可、
   源码附随说明。
@@ -210,6 +250,10 @@ tools\make-release.bat -SkipMuPdfSource   :: 不打包 MuPDF 源码
 正式发行前由发行方核验对应源码的获取方式、版本与实际构建的一致性。
 上传包中的 `tools\relink.bat` 与 `tools\relink.ps1` 已随源码保留。
 当前打包脚本还需生成并验证其所需的 `source\relink\obj` 和 `link-libs.txt`。
+
+Linux / 麒麟发行包用 `tools/make-deb-linux.sh` 生成
+`build/linux-deb/mapdfr_<版本>_arm64.deb`，同一目录下还有 `.sha256`
+校验值。deb 按 FHS 安装程序、MuPDF 共享库、桌面项、图标、说明书和许可证。
 
 ## PDF 转 Markdown
 

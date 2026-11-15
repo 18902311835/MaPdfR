@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-MaPdfR：Windows 独立 PDF 查看器（Qt 6 静态构建），阅读部分提取自作者的
+MaPdfR：Windows / Linux（麒麟 aarch64）独立 PDF 查看器（Qt 6 静态构建），阅读部分提取自作者的
 QtNotePad 2.36.2；MuPDF 1.27.2 支撑复制权限、打印、便笺和 Markdown 导出。
 阅读器另有查找（`QPdfSearchModel`）、工具栏缩放比例、HKCU PDF 文件类型注册
 与「关于 MaPdfR」窗口。
@@ -27,6 +27,24 @@ cmake -S . -B build\msvc2022_64-static -G Ninja -DCMAKE_BUILD_TYPE=Release ^
       -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
 ```
 
+Linux / 麒麟（aarch64）构建：
+
+```sh
+tools/build-mupdf-linux.sh /path/to/mupdf-1.27.2-source   # 生成 libmupdf.so
+tools/make-deb-linux.sh                                   # 构建 + 测试 + cpack
+# 产物：build/linux-deb/mapdfr_<版本>_arm64.deb
+```
+
+- Linux 用 **共享库** `libmupdf.so`（`-Bsymbolic`）：静态链接时 MuPDF 自带的
+  libjpeg/zlib/libpng 与 Qt6Pdf 内 PDFium 的副本重复定义。
+- MuPDF 源码树在 `MAPDFR_MUPDF_BUILD_DIR`（默认 `<MuPDF>/build/release`），
+  字体由 MuPDF Makefile 的 `HAVE_OBJCOPY` 嵌入，不走 `bin2coff`。
+- lcms2 前缀头分两份：MuPDF 核心不能前缀 `sscanf`（GCC `<cstdio>` 找不到
+  `::sscanf`），见 `tools/build-mupdf-linux.sh`。
+- 麒麟 V10 的 CMake 3.16 不够用（Qt 6.11 要 3.22+），脚本优先用
+  `~/.local/bin/cmake`；无显示环境测试用 `xvfb-run -a ctest`。
+- 静态 Qt 需要静态 OpenSSL：配置时传 `-DOPENSSL_ROOT_DIR=/data/qt-static-deps/openssl`。
+
 - 全部代码用 **MSVC + `/MT`**（静态 Qt 的要求，也是 MuPDF 静态库的要求）。
 - 版本号唯一来源是 `CMakeLists.txt` 的 `project(MaPdfR VERSION …)`；通过
   `MAPDFR_APP_VERSION` 编译定义传给 `main.cpp`、`AboutDialog`，同时用于
@@ -34,7 +52,9 @@ cmake -S . -B build\msvc2022_64-static -G Ninja -DCMAKE_BUILD_TYPE=Release ^
 - 测试（`ctest --test-dir …`）：
   - `MaPdfR.ReaderSmoke`：打不开的文件返回 `isLoaded()==false` + 错误文本、
     正常 PDF 可加载、缩放标签显示百分比、查找能命中 fixture 文本、
-    `MaPdfRFileType::selfTest()` 的隔离注册表往返。
+    `MaPdfRFileType::selfTest()` 的隔离注册表往返；Linux 上改为在临时
+    `XDG_DATA_HOME` / `XDG_CONFIG_HOME` 里验证 .desktop 写入、`xdg-mime`
+    默认程序写入与注销清理。
   - `MaPdfR.MarkdownExport`：PDF → Markdown 的内容断言与 MuPDF/PDFium 共存。
 - `-DMAPDFR_WITH_MUPDF=OFF` 可跳过 MuPDF，保留阅读、导航、搜索、选区高亮和帮助。
 - 正式发行前需把真实链接参数和目标文件接入发行打包，并执行重链接测试。
@@ -55,6 +75,9 @@ cmake -S . -B build\msvc2022_64-static -G Ninja -DCMAKE_BUILD_TYPE=Release ^
 | `src/ui/AboutDialog.{h,cpp}` | 关于窗口：关于 / 第三方组件 / 版权与许可 |
 | `resources/pdf.ico` | `.pdf` 文件类型图标（16–256），注册表 DefaultIcon 引用 |
 | `tools/make-release.{bat,ps1}` | 发行打包：EXE + 文档 + 工程源码 + 可重新链接材料 + SHA256 |
+| `tools/build-mupdf-linux.sh` | Linux 用 MuPDF Makefile 构建 `libmupdf.so`（lcms2 前缀、`-Bsymbolic`） |
+| `tools/make-deb-linux.sh`、`tools/deb/` | 麒麟/Linux 构建 + cpack DEB 打包与 postinst/postrm |
+| `resources/linux/mapdfr.desktop`、`resources/linux/icons/` | Linux 桌面启动项与 16–256 像素启动器图标 |
 | `tools/relink.{bat,ps1}` | 用修改后的静态 Qt 重新链接应用目标文件（LGPL §4(d)(0)） |
 | `licenses/` | LGPL v3 / GPL v3 全文（静态 Qt 随附文本） |
 | `cmake/mupdf.cmake` | MuPDF 静态库集成 |
@@ -80,6 +103,14 @@ cmake -S . -B build\msvc2022_64-static -G Ninja -DCMAKE_BUILD_TYPE=Release ^
   - 取消注册只删本程序写入的值，不动 `.pdf` 原有处理程序；
   - `MaPdfRFileType::selfTest()` 在 `HKCU\Software\MaPdfR\SelfTest\<uuid>` 做
     注册→查询→注销往返，测试不得触碰真实关联。
+- Linux 的关联实现：注册 = 写 `~/.local/share/applications/mapdfr.desktop`
+  （`MimeType=application/pdf;` 与 `Exec="<绝对路径>" %F`）；设为默认 =
+  `xdg-mime default mapdfr.desktop application/pdf`；取消注册 = 删除该文件并
+  从 `~/.config/mimeapps.list` 摘掉条目。deb 安装的桌面项在
+  `/usr/share/applications`，两者都参与系统「打开方式」。
+- 二进制在 Linux 上叫 `mapdfr`（`OUTPUT_NAME`），安装 RPATH 为
+  `$ORIGIN/../lib/mapdfr`；`QGuiApplication::setDesktopFileName("mapdfr")`
+  让窗口归到启动器图标下。
 - 测试依赖的 objectName：`ReaderPageSpin`、`ReaderPdfView`、`ReaderZoomLabel`、
   `ReaderSearchEdit`、`ReaderSearchStatus`、`ReaderFindToolBar`。
 

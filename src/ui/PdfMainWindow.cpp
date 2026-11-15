@@ -536,7 +536,6 @@ void PdfMainWindow::buildMenus()
     guide->setObjectName(QStringLiteral("ReaderUserGuide"));
     helpMenu->addSeparator();
 
-#ifdef Q_OS_WIN
     QAction* registerTypeAction =
         helpMenu->addAction(tr("注册 PDF 文件类型(&R)..."));
     connect(registerTypeAction,
@@ -559,7 +558,6 @@ void PdfMainWindow::buildMenus()
             &PdfMainWindow::onSetDefaultPdfApp);
 
     helpMenu->addSeparator();
-#endif
 
     QAction* aboutAction = helpMenu->addAction(tr("关于 MaPdfR(&A)"));
     connect(aboutAction,
@@ -1023,6 +1021,7 @@ void PdfMainWindow::onSaveAs()
 
 QString PdfMainWindow::ensurePdfIconFile()
 {
+#ifdef Q_OS_WIN
     const QString bundled = QDir(
         QCoreApplication::applicationDirPath())
         .filePath(QStringLiteral("pdf.ico"));
@@ -1051,6 +1050,33 @@ QString PdfMainWindow::ensurePdfIconFile()
     }
 
     return extracted;
+#else
+    // 桌面项（Desktop Entry）的 Icon 只能是主题名或真实文件路径，
+    // qrc 路径不可用。用 256×256 的 PNG 释放到应用数据目录。
+    const QString bundled = QDir(
+        QCoreApplication::applicationDirPath())
+        .filePath(QStringLiteral("mapdfr.png"));
+
+    if (QFileInfo::exists(bundled))
+        return bundled;
+
+    const QString dataDir =
+        QStandardPaths::writableLocation(
+            QStandardPaths::AppLocalDataLocation);
+
+    if (dataDir.isEmpty() || !QDir().mkpath(dataDir))
+        return QString();
+
+    const QString extracted =
+        QDir(dataDir).filePath(QStringLiteral("mapdfr.png"));
+
+    if (!QFileInfo::exists(extracted)) {
+        if (!QFile::copy(QStringLiteral(":/app.png"), extracted))
+            return QString();
+    }
+
+    return extracted;
+#endif
 }
 
 void PdfMainWindow::onRegisterPdfType()
@@ -1063,13 +1089,14 @@ void PdfMainWindow::onRegisterPdfType()
         QMessageBox::critical(
             this,
             tr("注册 PDF 文件类型失败"),
-            tr("无法写入当前用户注册表：\n%1").arg(error));
+            tr("无法注册 PDF 文件类型：\n%1").arg(error));
         return;
     }
 
     statusBar()->showMessage(
         tr("已注册 PDF 文件类型：%1").arg(exePath), 5000);
 
+#ifdef Q_OS_WIN
     const QMessageBox::StandardButton answer =
         QMessageBox::question(
             this,
@@ -1083,16 +1110,38 @@ void PdfMainWindow::onRegisterPdfType()
 
     if (answer == QMessageBox::Yes)
         onSetDefaultPdfApp();
+#else
+    const QMessageBox::StandardButton answer =
+        QMessageBox::question(
+            this,
+            tr("注册 PDF 文件类型"),
+            tr("已把 MaPdfR 加入 PDF 的「打开方式」列表。\n\n"
+               "是否现在把 MaPdfR 设为 PDF 的默认打开程序？"),
+            QMessageBox::Yes | QMessageBox::No,
+            QMessageBox::Yes);
+
+    if (answer == QMessageBox::Yes)
+        onSetDefaultPdfApp();
+#endif
 }
 
 void PdfMainWindow::onUnregisterPdfType()
 {
+#ifdef Q_OS_WIN
+    const QString question =
+        tr("将从当前用户注册表删除 MaPdfR 的 PDF 文件类型注册。\n"
+           "已有的 PDF 文件不会被删除或修改。是否继续？");
+#else
+    const QString question =
+        tr("将删除 MaPdfR 的用户桌面项，并从 PDF 的关联列表中移除。\n"
+           "已有的 PDF 文件不会被删除或修改。是否继续？");
+#endif
+
     const QMessageBox::StandardButton answer =
         QMessageBox::question(
             this,
             tr("取消 PDF 文件类型注册"),
-            tr("将从当前用户注册表删除 MaPdfR 的 PDF 文件类型注册。\n"
-               "已有的 PDF 文件不会被删除或修改。是否继续？"),
+            question,
             QMessageBox::Yes | QMessageBox::No,
             QMessageBox::No);
 
@@ -1134,12 +1183,18 @@ void PdfMainWindow::onSetDefaultPdfApp()
             return;
         }
 
+#ifdef Q_OS_WIN
+        const QString hint =
+            tr("也可以在 Windows「设置 → 应用 → 默认应用」中"
+               "手动为 .pdf 选择 MaPdfR。");
+#else
+        const QString hint =
+            tr("也可以在系统设置的「默认应用」中手动为 PDF 选择 MaPdfR。");
+#endif
         QMessageBox::critical(
             this,
             tr("无法设置默认程序"),
-            tr("%1\n\n也可以在 Windows「设置 → 应用 → 默认应用」中"
-               "手动为 .pdf 选择 MaPdfR。")
-                .arg(error));
+            tr("%1\n\n%2").arg(error, hint));
         return;
     }
 

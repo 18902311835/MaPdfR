@@ -188,7 +188,11 @@ AboutDialog::AboutDialog(QWidget* parent, Page initialPage)
     : QDialog(parent)
 {
     setWindowTitle(tr("关于 MaPdfR"));
+#ifdef Q_OS_WIN
     setWindowIcon(QIcon(QStringLiteral(":/app.ico")));
+#else
+    setWindowIcon(QIcon(QStringLiteral(":/app.png")));
+#endif
     setMinimumSize(760, 620);
 
     auto* mainLayout = new QVBoxLayout(this);
@@ -230,8 +234,12 @@ AboutDialog::AboutDialog(QWidget* parent, Page initialPage)
 
     auto* versionLabel = new QLabel(
         tr("版本 %1").arg(QStringLiteral(MAPDFR_APP_VERSION)), this);
-    auto* descLabel = new QLabel(
-        tr("Windows 独立 PDF 查看器 · 作者 马德有"), this);
+#ifdef Q_OS_WIN
+    const QString description = tr("Windows 独立 PDF 查看器 · 作者 马德有");
+#else
+    const QString description = tr("Linux 独立 PDF 查看器 · 作者 马德有");
+#endif
+    auto* descLabel = new QLabel(description, this);
 
     titleLayout->addWidget(nameLabel);
     titleLayout->addWidget(versionLabel);

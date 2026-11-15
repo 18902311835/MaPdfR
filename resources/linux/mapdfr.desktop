@@ -1,0 +1,19 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=MaPdfR
+Name[zh_CN]=MaPdfR PDF 阅读器
+GenericName=PDF Viewer
+GenericName[zh_CN]=PDF 阅读器
+Comment=Read, search, print and export PDF documents
+Comment[zh_CN]=阅读、查找、打印和导出 PDF 文档
+Exec=mapdfr %F
+TryExec=mapdfr
+Icon=mapdfr
+Terminal=false
+Categories=Office;Viewer;
+MimeType=application/pdf;
+Keywords=PDF;Reader;Viewer;
+Keywords[zh_CN]=PDF;阅读器;查看器;
+StartupNotify=true
+StartupWMClass=MaPdfR

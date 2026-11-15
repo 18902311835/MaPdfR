@@ -166,6 +166,14 @@ endif()
 
 add_executable(MaPdfR WIN32 ${MAPDFR_APP_SOURCES})
 
+# Linux：安装后的二进制叫 mapdfr（与 .desktop 的 Exec 一致），
+# MuPDF 共享库放在 /usr/lib/mapdfr，运行时通过相对 RPATH 找到。
+if(UNIX AND NOT APPLE)
+    set_target_properties(MaPdfR PROPERTIES
+        OUTPUT_NAME mapdfr
+        INSTALL_RPATH "$ORIGIN/../lib/mapdfr")
+endif()
+
 target_include_directories(MaPdfR PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui
     ${CMAKE_CURRENT_SOURCE_DIR}/src/io
@@ -177,11 +185,13 @@ target_compile_definitions(MaPdfR PRIVATE
     MAPDFR_APP_VERSION="${PROJECT_VERSION}")
 
 # 发行目录里放 pdf.ico，注册表的 DefaultIcon 直接引用它。
-add_custom_command(TARGET MaPdfR POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/resources/pdf.ico"
-        "$<TARGET_FILE_DIR:MaPdfR>/pdf.ico"
-    COMMENT "Copying pdf.ico next to MaPdfR.exe")
+if(WIN32)
+    add_custom_command(TARGET MaPdfR POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_CURRENT_SOURCE_DIR}/resources/pdf.ico"
+            "$<TARGET_FILE_DIR:MaPdfR>/pdf.ico"
+        COMMENT "Copying pdf.ico next to MaPdfR.exe")
+endif()
 
 target_link_libraries(MaPdfR PRIVATE
     Qt6::Core
@@ -294,15 +304,80 @@ if(MAPDFR_BUILD_TESTS)
     endif()
 endif()
 
-# === 安装（便携式布局：EXE + 许可声明）===
-install(TARGETS MaPdfR RUNTIME DESTINATION . BUNDLE DESTINATION .)
-install(FILES
-    "${CMAKE_CURRENT_SOURCE_DIR}/resources/pdf.ico"
-    "${CMAKE_CURRENT_SOURCE_DIR}/resources/help/user-guide.zh_CN.html"
-    DESTINATION .)
-install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/licenses/" DESTINATION licenses)
-foreach(_mapdfr_notice README.md THIRD_PARTY.md LICENSE.txt COPYRIGHT.md PROFESSIONAL_REVIEW.md)
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_mapdfr_notice}")
-        install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/${_mapdfr_notice}" DESTINATION .)
+# === 安装 ===
+if(UNIX AND NOT APPLE)
+    # Linux / 麒麟：FHS 布局，供 CPack DEB 打包。
+    install(TARGETS MaPdfR RUNTIME DESTINATION bin)
+
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/resources/linux/mapdfr.desktop"
+        DESTINATION share/applications)
+
+    foreach(_mapdfr_icon_size 16 24 32 48 64 128 256)
+        install(FILES
+            "${CMAKE_CURRENT_SOURCE_DIR}/resources/linux/icons/mapdfr-${_mapdfr_icon_size}.png"
+            DESTINATION "share/icons/hicolor/${_mapdfr_icon_size}x${_mapdfr_icon_size}/apps"
+            RENAME mapdfr.png)
+    endforeach()
+
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/resources/help/user-guide.zh_CN.html"
+        DESTINATION share/doc/mapdfr)
+    install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/licenses/"
+        DESTINATION share/doc/mapdfr/licenses)
+    foreach(_mapdfr_notice README.md THIRD_PARTY.md LICENSE.txt COPYRIGHT.md PROFESSIONAL_REVIEW.md)
+        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_mapdfr_notice}")
+            install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/${_mapdfr_notice}"
+                DESTINATION share/doc/mapdfr)
+        endif()
+    endforeach()
+
+    # MuPDF 共享库：与二进制一起分发，RPATH 指向 lib/mapdfr。
+    if(MAPDFR_WITH_MUPDF)
+        file(GLOB _mapdfr_mupdf_runtime
+            "${MAPDFR_MUPDF_BUILD_DIR}/libmupdf.so.[0-9]*")
+        list(FILTER _mapdfr_mupdf_runtime EXCLUDE REGEX "\\.in$")
+        install(FILES ${_mapdfr_mupdf_runtime} DESTINATION lib/mapdfr)
     endif()
-endforeach()
+
+    # === DEB 打包 ===
+    # cmake --build … 后执行：cpack --config build/<dir>/CPackConfig.cmake -G DEB
+    set(CPACK_GENERATOR "DEB")
+    set(CPACK_PACKAGE_NAME "mapdfr")
+    set(CPACK_PACKAGE_VENDOR "MaPdfR")
+    set(CPACK_PACKAGE_CONTACT
+        "MaPdfR <18902311835@users.noreply.github.com>")
+    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
+        "MaPdfR PDF 阅读器（Qt 6 + MuPDF，静态链接）")
+    set(CPACK_PACKAGE_DESCRIPTION
+        "MaPdfR 是独立的 PDF 阅读器，支持多标签阅读、查找、打印、便笺、文本复制和 PDF 到 Markdown 导出。程序静态链接 Qt 6 与 MuPDF，除系统基础库外不依赖额外的运行时。")
+    set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+    set(CPACK_PACKAGING_INSTALL_PREFIX "/usr")
+    set(CPACK_PACKAGE_CHECKSUM "SHA256")
+
+    set(CPACK_DEBIAN_PACKAGE_NAME "mapdfr")
+    set(CPACK_DEBIAN_PACKAGE_MAINTAINER
+        "MaPdfR <18902311835@users.noreply.github.com>")
+    set(CPACK_DEBIAN_PACKAGE_SECTION "graphics")
+    set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
+    # 用 dpkg-shlibdeps 计算系统库依赖（X11 / glib / fontconfig 等）。
+    # 静态 Qt 与 MuPDF 自身的库不产生外部依赖。
+    set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+    set(CPACK_DEBIAN_PACKAGE_RECOMMENDS "xdg-utils")
+    set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/deb/postinst;${CMAKE_CURRENT_SOURCE_DIR}/tools/deb/postrm")
+    set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+
+    include(CPack)
+else()
+    # Windows 便携式布局：EXE + 许可声明。
+    install(TARGETS MaPdfR RUNTIME DESTINATION . BUNDLE DESTINATION .)
+    install(FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/pdf.ico"
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/help/user-guide.zh_CN.html"
+        DESTINATION .)
+    install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/licenses/" DESTINATION licenses)
+    foreach(_mapdfr_notice README.md THIRD_PARTY.md LICENSE.txt COPYRIGHT.md PROFESSIONAL_REVIEW.md)
+        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_mapdfr_notice}")
+            install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/${_mapdfr_notice}" DESTINATION .)
+        endif()
+    endforeach()
+endif()
