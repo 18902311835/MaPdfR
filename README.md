@@ -21,7 +21,7 @@ Markdown。Adobe Reader 9.1 中文版参照与测试范围见 [专业应用评�
 
 1. [18902311835](https://github.com/18902311835)（马德有）
 2. DeepSeek（LLM）
-3. Claude Code
+3. Claude Code (Tools)
 
 ## 功能
 
