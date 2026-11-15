@@ -17,6 +17,12 @@ Markdown。Adobe Reader 9.1 中文版参照与测试范围见 [专业应用评�
 - 选择 AGPL v3 是因为本程序静态链接了同为 AGPL v3 的 MuPDF，整份二进制
   须按 AGPL v3 提供源码。
 
+## 贡献者
+
+1. [18902311835](https://github.com/18902311835)（马德有）
+2. DeepSeek（LLM）
+3. Claude Code
+
 ## 功能
 
 - 打开 PDF，支持命令行参数、窗口拖放和「打开」对话框
@@ -174,6 +180,16 @@ deb 安装布局：
 系统依赖由 `dpkg-shlibdeps` 计算（X11 / glib / fontconfig / ICU 等），
 无需安装 Qt 或 MuPDF 的开发包即可运行。无显示环境跑测试时用
 `xvfb-run -a ctest`。
+
+不需要安装（也不用 sudo）时，用便携包：
+
+```sh
+tools/make-tar-linux.sh
+# 产物：build/linux-deb/MaPdfR-<版本>-linux-aarch64.tar.gz
+tar xzf MaPdfR-<版本>-linux-aarch64.tar.gz
+cd MaPdfR-<版本>-linux-aarch64 && ./mapdfr 示例.pdf
+./install-user.sh          # 可选：安装到 ~/.local，带桌面项与图标
+```
 
 产物（Windows）：`build\msvc2022_64-static\MaPdfR.exe`。
 

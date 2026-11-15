@@ -77,6 +77,7 @@ tools/make-deb-linux.sh                                   # 构建 + 测试 + cp
 | `tools/make-release.{bat,ps1}` | 发行打包：EXE + 文档 + 工程源码 + 可重新链接材料 + SHA256 |
 | `tools/build-mupdf-linux.sh` | Linux 用 MuPDF Makefile 构建 `libmupdf.so`（lcms2 前缀、`-Bsymbolic`） |
 | `tools/make-deb-linux.sh`、`tools/deb/` | 麒麟/Linux 构建 + cpack DEB 打包与 postinst/postrm |
+| `tools/make-tar-linux.sh` | 免安装 tar.gz 便携包（`./mapdfr` 直接运行，可选 `install-user.sh`） |
 | `resources/linux/mapdfr.desktop`、`resources/linux/icons/` | Linux 桌面启动项与 16–256 像素启动器图标 |
 | `tools/relink.{bat,ps1}` | 用修改后的静态 Qt 重新链接应用目标文件（LGPL §4(d)(0)） |
 | `licenses/` | LGPL v3 / GPL v3 全文（静态 Qt 随附文本） |

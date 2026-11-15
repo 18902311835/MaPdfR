@@ -6,6 +6,12 @@
 - 源码仓库：<https://github.com/18902311835/MaPdfR>
 - 联系邮箱：<1751515413@qq.com>
 
+## 贡献者
+
+1. [18902311835](https://github.com/18902311835)（马德有）
+2. DeepSeek（LLM）
+3. Claude Code
+
 ## 本工程许可证
 
 本工程（源代码、可执行程序、图标资源及文档）以 **GNU Affero General Public

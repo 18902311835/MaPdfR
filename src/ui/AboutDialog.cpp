@@ -65,6 +65,7 @@ QString aboutPageHtml()
   <tr><td class='label'>名称：</td><td>MaPdfR</td></tr>
   <tr><td class='label'>版本：</td><td>%1</td></tr>
   <tr><td class='label'>作者：</td><td>马德有</td></tr>
+  <tr><td class='label'>贡献者：</td><td>18902311835（马德有）、DeepSeek（LLM）、Claude Code</td></tr>
   <tr><td class='label'>联系邮箱：</td><td><a href='mailto:1751515413@qq.com'>1751515413@qq.com</a></td></tr>
   <tr><td class='label'>源码仓库：</td><td><a href='https://github.com/18902311835/MaPdfR'>github.com/18902311835/MaPdfR</a></td></tr>
   <tr><td class='label'>许可证：</td><td>GNU AGPL v3</td></tr>
